@@ -74,7 +74,6 @@ RUN ./configure \
     --enable-nfsv41 \
     --enable-pnfs \
     --enable-blkmapd \
-    --disable-ipv6 \
     --disable-nfsdcltrack \
     --disable-nfsdcld \
     --without-tcp-wrappers \
