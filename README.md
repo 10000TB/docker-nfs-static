@@ -1,4 +1,6 @@
-# 🚀 Static NFS Toolchain, Transport Independent (e.g. TI-RPC)
+# 🚀 Static NFS Toolchain
+
+for no-hassle HPC / HPN experiments across platforms w/o worrying about linking messes.
 
 A specialized Docker-based build system to generate **fully static, standalone binaries**... for NFS utilities. These binaries are designed for high-performance storage environments, supporting **NFSv4.2, pNFS, RDMA, and IPv6**.
 
