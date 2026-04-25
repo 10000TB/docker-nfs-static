@@ -1,7 +1,8 @@
 # 🚀 Static NFS Toolchain
 
 ✨For no-hassle HPC / HPN experiments across platforms w/o worrying about linking messes    
-✨For simplicity. Simpler than fancy approaches like [`cpud`](https://github.com/u-root/cpu) (Just compile, and run!)
+✨Just compile, and (scp and) run      
+✨A simpler first step to try before advanced fancy approaches like [`cpud`](https://github.com/u-root/cpu)
 
 A specialized Docker-based build system to generate **fully static, standalone binaries**... for NFS utilities. These binaries are designed for high-performance storage environments, supporting **NFSv4.2, pNFS, RDMA, and IPv6**.
 
