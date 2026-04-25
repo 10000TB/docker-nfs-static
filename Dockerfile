@@ -3,6 +3,7 @@ ARG ARCH=amd64
 FROM ${ARCH}/alpine:3.19 AS builder
 
 # 1. Install build tools and headers
+# FIX: eudev-dev contains libudev.a; lvm2-dev + device-mapper-static provide libdevmapper.a
 RUN apk add --no-cache \
     build-base \
     autoconf \
@@ -29,6 +30,10 @@ RUN apk add --no-cache \
     libnsl-dev \
     linux-headers \
     bsd-compat-headers \
+    lvm2-dev \
+    device-mapper-static \
+    libaio-dev \
+    eudev-dev \
     file
 
 WORKDIR /src
@@ -58,14 +63,18 @@ RUN sed -i '1i #include <unistd.h>' support/reexport/reexport.c && \
     sed -i '1i #include <unistd.h>' support/reexport/fsidd.c
 
 # 6. Configure nfs-utils
+# - Enabled nfsv4/nfsv41 (supports 4.2)
+# - Enabled pnfs/blkmapd explicitly
 RUN ./configure \
     --prefix=/usr \
     --sysconfdir=/etc \
     --sbindir=/sbin \
     --disable-gss \
-    --disable-nfsv41 \
+    --enable-nfsv4 \
+    --enable-nfsv41 \
+    --enable-pnfs \
+    --enable-blkmapd \
     --disable-ipv6 \
-    --disable-reexport \
     --disable-nfsdcltrack \
     --disable-nfsdcld \
     --without-tcp-wrappers \
@@ -73,15 +82,16 @@ RUN ./configure \
     --enable-static \
     --disable-shared
 
-# 7. Build
+# 7. Build nfs-utils
+# FIX: Using absolute paths for static libraries ensures the linker finds them 
+# and avoids "cannot find -ldevmapper" errors during sub-component linking.
 RUN make -j$(nproc) \
     LDFLAGS="-all-static" \
     CFLAGS="-static -Wno-error" \
-    LIBS="-ltirpc -levent_core -levent -lblkid -luuid -lsqlite3 -lattr -lz -lpthread /usr/lib/libkeyutils.a"
+    LIBS="-ltirpc -levent_core -levent -lmount -lblkid -luuid /usr/lib/libdevmapper.a /usr/lib/libudev.a /usr/lib/libaio.a -lsqlite3 -lattr -lz -lpthread /usr/lib/libkeyutils.a"
 
 # 8. Install to a temporary directory
 RUN make install DESTDIR=/install
-
 
 # 8b. Download and Build RPCBIND statically
 WORKDIR /src
@@ -89,7 +99,7 @@ RUN curl -L https://downloads.sourceforge.net/project/rpcbind/rpcbind/1.2.6/rpcb
 
 WORKDIR /src/rpcbind-1.2.6
 
-# Fix service name mapping (common for Alpine/musl builds)
+# Fix service name mapping
 RUN sed -i "/servname/s:rpcbind:sunrpc:" src/rpcbind.c
 
 # Configure rpcbind
@@ -101,22 +111,17 @@ RUN ./configure \
     --with-tirpcinclude=/usr/include/tirpc \
     --without-systemdsystemunitdir
 
-# Build statically linked rpcbind and rpcinfo
-# FIX: Changed LDFLAGS from "-all-static" to "-static" for compatibility with raw gcc
+# Build rpcbind with -static
 RUN make -j$(nproc) \
     LDFLAGS="-static" \
     CFLAGS="-static -Wno-error" \
     LIBS="-ltirpc -lpthread"
 
-# Install to the temporary directory so Step 9 picks them up
+# Install rpcbind to the same temporary directory
 RUN make install DESTDIR=/install
 
-
-
-
 # 9. CONSOLIDATION STEP: 
-# Find actual ELF binaries, strip them, and move them to a flat /final folder.
-# This avoids the "file format not recognized" errors on scripts.
+# Find ELF binaries, strip them, and move them to a flat /final folder.
 RUN mkdir -p /final && \
     find /install -type f -executable -exec sh -c 'file "$1" | grep -q "ELF" && strip "$1" && cp "$1" /final/' _ {} \;
 
