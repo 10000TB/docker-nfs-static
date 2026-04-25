@@ -1,6 +1,4 @@
-# 🚀 High-Performance Static NFS Toolchain
-
-![Build Status](https://github.com/10000TB/docker-nfs-static/actions/workflows/build.yml/badge.svg)
+# 🚀 Static NFS Toolchain, Transport Independent (e.g. TI-RPC)
 
 A specialized Docker-based build system to generate **fully static, standalone binaries**... for NFS utilities. These binaries are designed for high-performance storage environments, supporting **NFSv4.2, pNFS, RDMA, and IPv6**.
 
