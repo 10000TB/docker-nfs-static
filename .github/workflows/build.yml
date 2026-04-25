@@ -1,0 +1,48 @@
+name: Build Static NFS Binaries
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch: # Allows manual trigger
+
+jobs:
+  build:
+    name: Build ${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # We use 'amd64' and 'arm64v8' to match Alpine's official image prefixes
+        include:
+          - arch: amd64
+            display_name: x86_64
+          - arch: arm64v8
+            display_name: arm64
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and Export Binaries
+        run: |
+          mkdir -p ./dist/${{ matrix.display_name }}
+          docker build \
+            --build-arg ARCH=${{ matrix.arch }} \
+            --output type=local,dest=./dist/${{ matrix.display_name }} \
+            .
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nfs-static-${{ matrix.display_name }}
+          path: ./dist/${{ matrix.display_name }}/
+          retention-days: 7

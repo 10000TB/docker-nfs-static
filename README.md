@@ -1,6 +1,8 @@
 # 🚀 High-Performance Static NFS Toolchain
 
-A specialized Docker-based build system to generate **fully static, standalone binaries** for NFS utilities. These binaries are designed for high-performance storage environments, supporting **NFSv4.2, pNFS, RDMA, and IPv6**.
+![Build Status](https://github.com/10000TB/docker-nfs-static/actions/workflows/build.yml/badge.svg)
+
+A specialized Docker-based build system to generate **fully static, standalone binaries**... for NFS utilities. These binaries are designed for high-performance storage environments, supporting **NFSv4.2, pNFS, RDMA, and IPv6**.
 
 By linking everything statically, these binaries run on any Linux distribution without needing `libtirpc`, `libevent`, or `keyutils` installed on the host. This is ideal for minimal environments like Alpine, Clear Linux, custom initramfs, or containers.
 
