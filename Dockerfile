@@ -1,9 +1,11 @@
 # syntax=docker/dockerfile:1
+# This Dockerfile is now Multi-Arch (amd64/arm64) compatible.
+# Default to amd64, but can be overridden via --build-arg ARCH=arm64v8
 ARG ARCH=amd64
 FROM ${ARCH}/alpine:3.19 AS builder
 
 # 1. Install build tools and headers
-# REMOVED: libtirpc-dev and libtirpc-static to ensure no conflict with custom build
+# All these packages are available in the official Alpine repositories for both amd64 and arm64.
 RUN apk add --no-cache \
     build-base \
     autoconf \
@@ -37,6 +39,7 @@ RUN apk add --no-cache \
 WORKDIR /src
 
 # 2. Build KEYUTILS from source (Ensures we have a clean libkeyutils.a)
+# CFLAGS are neutral; -fPIC is safe for both x86 and ARM.
 RUN curl -L https://git.kernel.org/pub/scm/linux/kernel/git/dhowells/keyutils.git/snapshot/keyutils-1.6.3.tar.gz | tar -xz && \
     cd keyutils-1.6.3 && \
     make libkeyutils.a CFLAGS="-static -fPIC" && \
@@ -44,7 +47,7 @@ RUN curl -L https://git.kernel.org/pub/scm/linux/kernel/git/dhowells/keyutils.gi
     cp keyutils.h /usr/include/
 
 # 3. Build CUSTOM LIBTIRPC (Forced IPv6)
-# Building from source here is now the ONLY Tirpc on the system
+# Building from source ensures we have consistent IPv6 behavior regardless of architecture.
 RUN curl -L https://downloads.sourceforge.net/project/libtirpc/libtirpc/1.3.4/libtirpc-1.3.4.tar.bz2 | tar -xj && \
     cd libtirpc-1.3.4 && \
     ./configure \
@@ -62,11 +65,12 @@ RUN curl -L https://www.kernel.org/pub/linux/utils/nfs-utils/2.6.4/nfs-utils-2.6
 
 WORKDIR /src/nfs-utils-2.6.4
 
-# 5. FIX SOURCE CODE BUGS
+# 5. FIX SOURCE CODE BUGS (musl/arch neutral)
 RUN sed -i '1i #include <unistd.h>' support/reexport/reexport.c && \
     sed -i '1i #include <unistd.h>' support/reexport/fsidd.c
 
 # 6. Configure nfs-utils (IPv6 + RDMA Enabled)
+# --enable-rdma will pull in the architecture-specific kernel headers automatically.
 RUN ./configure \
     --prefix=/usr \
     --sysconfdir=/etc \
@@ -86,6 +90,7 @@ RUN ./configure \
     --disable-shared
 
 # 7. Build nfs-utils
+# The linking paths for .a files are consistent across Alpine architectures.
 RUN make -j$(nproc) \
     LDFLAGS="-all-static" \
     CFLAGS="-static -Wno-error" \
@@ -113,7 +118,7 @@ RUN ./configure \
     --with-tirpcinclude=/usr/include/tirpc \
     --without-systemdsystemunitdir
 
-# Build rpcbind with -static
+# Build rpcbind with -static (arch-neutral linker flag)
 RUN make -j$(nproc) \
     LDFLAGS="-static" \
     CFLAGS="-static -Wno-error" \
@@ -122,7 +127,9 @@ RUN make -j$(nproc) \
 # Install rpcbind to the same temporary directory
 RUN make install DESTDIR=/install
 
-# 9. CONSOLIDATION STEP
+# 9. CONSOLIDATION STEP: 
+# The 'file' and 'strip' commands are architecture-aware and will process 
+# ARM64 or x86_64 ELFs correctly.
 RUN mkdir -p /final && \
     find /install -type f -executable -exec sh -c 'file "$1" | grep -q "ELF" && strip "$1" && cp "$1" /final/' _ {} \;
 

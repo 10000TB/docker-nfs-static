@@ -27,5 +27,15 @@ By linking everything statically, these binaries run on any Linux distribution w
 The build process happens entirely inside a container. The resulting binaries are exported directly to your host machine in a `./bin` folder.
 
 ### 1. Build for your current architecture (AMD64/x86_64)
+
 ```bash
-docker build --output type=local,dest=./bin .
+docker build --build-arg ARCH=amd64 -t nfs-static .
+```
+
+### 2. ARM64
+
+```
+docker build --build-arg ARCH=arm64v8 -t nfs-static 
+```
+
+NOTE Qemu emulation need be registrated for cross-compilation, `docker run --rm --privileged multiarch/qemu-user-static --reset -p yes`
