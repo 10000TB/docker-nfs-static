@@ -82,6 +82,38 @@ RUN make -j$(nproc) \
 # 8. Install to a temporary directory
 RUN make install DESTDIR=/install
 
+
+# 8b. Download and Build RPCBIND statically
+WORKDIR /src
+RUN curl -L https://downloads.sourceforge.net/project/rpcbind/rpcbind/1.2.6/rpcbind-1.2.6.tar.bz2 | tar -xj
+
+WORKDIR /src/rpcbind-1.2.6
+
+# Fix service name mapping (common for Alpine/musl builds)
+RUN sed -i "/servname/s:rpcbind:sunrpc:" src/rpcbind.c
+
+# Configure rpcbind
+RUN ./configure \
+    --prefix=/usr \
+    --bindir=/sbin \
+    --with-rpcuser=root \
+    --enable-warmstarts \
+    --with-tirpcinclude=/usr/include/tirpc \
+    --without-systemdsystemunitdir
+
+# Build statically linked rpcbind and rpcinfo
+# FIX: Changed LDFLAGS from "-all-static" to "-static" for compatibility with raw gcc
+RUN make -j$(nproc) \
+    LDFLAGS="-static" \
+    CFLAGS="-static -Wno-error" \
+    LIBS="-ltirpc -lpthread"
+
+# Install to the temporary directory so Step 9 picks them up
+RUN make install DESTDIR=/install
+
+
+
+
 # 9. CONSOLIDATION STEP: 
 # Find actual ELF binaries, strip them, and move them to a flat /final folder.
 # This avoids the "file format not recognized" errors on scripts.
