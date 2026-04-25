@@ -31,13 +31,13 @@ The build process happens entirely inside a container. The resulting binaries ar
 ### 1. AMD64/x86_64
 
 ```bash
-docker build --build-arg ARCH=amd64 -t nfs-static .
+docker build --build-arg ARCH=amd64 --output type=local,dest=./bin .
 ```
 
 ### 2. ARM64
 
 ```
-docker build --build-arg ARCH=arm64v8 -t nfs-static 
+docker build --build-arg ARCH=amd64v8 --output type=local,dest=./bin .
 ```
 
 NOTE Qemu emulation need be registrated for cross-compilation, `docker run --rm --privileged multiarch/qemu-user-static --reset -p yes`
