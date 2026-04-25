@@ -8,7 +8,7 @@ RDMA_PORT=${4:-20049}
 
 if [[ -z "$SERVER_IP" || -z "$REMOTE_PATH" || -z "$LOCAL_MOUNT" ]]; then
     echo "Usage: $0 <SERVER_IP> <REMOTE_PATH> <LOCAL_MOUNT> [RDMA_PORT]"
-    echo "Example: $0 2002:a05:673e:80c2:: /mnt/nfs_ramdisk /mnt/remote_rdma"
+    echo "Example: $0 <ServerIP>  /mnt/nfs_ramdisk /mnt/remote_rdma"
     exit 1
 fi
 

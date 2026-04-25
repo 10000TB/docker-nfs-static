@@ -8,7 +8,7 @@ NFS_THREADS=${4:-8}
 
 if [[ -z "$EXPORT_PATH" || -z "$CLIENT_IP" ]]; then
     echo "Usage: $0 <EXPORT_PATH> <CLIENT_IP> [RDMA_PORT] [THREADS]"
-    echo "Example: $0 /mnt/nfs_ramdisk 2002:a05:673e:80c8::1"
+    echo "Example: $0 /mnt/nfs_ramdisk <ClientIP>"
     exit 1
 fi
 
