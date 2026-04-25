@@ -28,7 +28,7 @@ By linking everything statically, these binaries run on any Linux distribution w
 
 The build process happens entirely inside a container. The resulting binaries are exported directly to your host machine in a `./bin` folder.
 
-### 1. Build for your current architecture (AMD64/x86_64)
+### 1. AMD64/x86_64
 
 ```bash
 docker build --build-arg ARCH=amd64 -t nfs-static .
