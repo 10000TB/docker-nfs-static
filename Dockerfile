@@ -3,7 +3,7 @@ ARG ARCH=amd64
 FROM ${ARCH}/alpine:3.19 AS builder
 
 # 1. Install build tools and headers
-# FIX: eudev-dev contains libudev.a; lvm2-dev + device-mapper-static provide libdevmapper.a
+# REMOVED: libtirpc-dev and libtirpc-static to ensure no conflict with custom build
 RUN apk add --no-cache \
     build-base \
     autoconf \
@@ -12,8 +12,6 @@ RUN apk add --no-cache \
     pkgconf \
     util-linux-dev \
     util-linux-static \
-    libtirpc-dev \
-    libtirpc-static \
     libcap-dev \
     libcap-static \
     libevent-dev \
@@ -45,10 +43,16 @@ RUN curl -L https://git.kernel.org/pub/scm/linux/kernel/git/dhowells/keyutils.gi
     cp libkeyutils.a /usr/lib/ && \
     cp keyutils.h /usr/include/
 
-# 3. Build LIBTIRPC from source (WITHOUT GSS support)
+# 3. Build CUSTOM LIBTIRPC (Forced IPv6)
+# Building from source here is now the ONLY Tirpc on the system
 RUN curl -L https://downloads.sourceforge.net/project/libtirpc/libtirpc/1.3.4/libtirpc-1.3.4.tar.bz2 | tar -xj && \
     cd libtirpc-1.3.4 && \
-    ./configure --prefix=/usr --disable-gssapi --enable-static --disable-shared && \
+    ./configure \
+        --prefix=/usr \
+        --disable-gssapi \
+        --enable-ipv6 \
+        --enable-static \
+        --disable-shared && \
     make -j$(nproc) && \
     make install
 
@@ -62,9 +66,7 @@ WORKDIR /src/nfs-utils-2.6.4
 RUN sed -i '1i #include <unistd.h>' support/reexport/reexport.c && \
     sed -i '1i #include <unistd.h>' support/reexport/fsidd.c
 
-# 6. Configure nfs-utils
-# - Enabled nfsv4/nfsv41 (supports 4.2)
-# - Enabled pnfs/blkmapd explicitly
+# 6. Configure nfs-utils (IPv6 + RDMA Enabled)
 RUN ./configure \
     --prefix=/usr \
     --sysconfdir=/etc \
@@ -75,6 +77,7 @@ RUN ./configure \
     --enable-pnfs \
     --enable-blkmapd \
     --enable-ipv6 \
+    --enable-rdma \
     --disable-nfsdcltrack \
     --disable-nfsdcld \
     --without-tcp-wrappers \
@@ -83,8 +86,6 @@ RUN ./configure \
     --disable-shared
 
 # 7. Build nfs-utils
-# FIX: Using absolute paths for static libraries ensures the linker finds them 
-# and avoids "cannot find -ldevmapper" errors during sub-component linking.
 RUN make -j$(nproc) \
     LDFLAGS="-all-static" \
     CFLAGS="-static -Wno-error" \
@@ -93,7 +94,7 @@ RUN make -j$(nproc) \
 # 8. Install to a temporary directory
 RUN make install DESTDIR=/install
 
-# 8b. Download and Build RPCBIND statically
+# 8b. Download and Build RPCBIND statically (IPv6 Enabled)
 WORKDIR /src
 RUN curl -L https://downloads.sourceforge.net/project/rpcbind/rpcbind/1.2.6/rpcbind-1.2.6.tar.bz2 | tar -xj
 
@@ -108,6 +109,7 @@ RUN ./configure \
     --bindir=/sbin \
     --with-rpcuser=root \
     --enable-warmstarts \
+    --enable-ipv6 \
     --with-tirpcinclude=/usr/include/tirpc \
     --without-systemdsystemunitdir
 
@@ -120,8 +122,7 @@ RUN make -j$(nproc) \
 # Install rpcbind to the same temporary directory
 RUN make install DESTDIR=/install
 
-# 9. CONSOLIDATION STEP: 
-# Find ELF binaries, strip them, and move them to a flat /final folder.
+# 9. CONSOLIDATION STEP
 RUN mkdir -p /final && \
     find /install -type f -executable -exec sh -c 'file "$1" | grep -q "ELF" && strip "$1" && cp "$1" /final/' _ {} \;
 
