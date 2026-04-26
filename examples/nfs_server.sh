@@ -21,6 +21,11 @@ sudo pkill -9 rpc.mountd 2>/dev/null
 sudo pkill -9 rpcbind 2>/dev/null
 sleep 1
 
+# 1.b Ramdisk
+sudo mkdir -p /mnt/nfs_ramdisk
+sudo mount -t tmpfs -o size=200G tmpfs /mnt/nfs_ramdisk
+sudo chmod 777 /mnt/nfs_cnssd /mnt/nfs_ramdisk
+
 # 2. Kernel Modules
 sudo modprobe nfsd
 sudo modprobe svcrdma

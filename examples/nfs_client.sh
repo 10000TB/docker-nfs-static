@@ -2,21 +2,24 @@
 
 SERVER_IP=${1}
 REMOTE_PATH=${2}
-LOCAL_MOUNT=${3}
-RDMA_PORT=${4:-20049}
+RDMA_MOUNT=${3}
+TCP_MOUNT=${4}
+RDMA_PORT=${5:-20049}
 
-if [[ -z "$SERVER_IP" || -z "$REMOTE_PATH" || -z "$LOCAL_MOUNT" ]]; then
-    echo "Usage: $0 <SERVER_IP> <REMOTE_PATH> <LOCAL_MOUNT> [RDMA_PORT]"
+if [[ -z "$SERVER_IP" || -z "$REMOTE_PATH" || -z "$RDMA_MOUNT" || -z "$TCP_MOUNT" ]]; then
+    echo "Usage: $0 <SERVER_IP> <REMOTE_PATH> <RDMA_MOUNT_POINT> <TCP_MOUNT_POINT> [RDMA_PORT]"
     exit 1
 fi
 
 HOST_ALIAS="nfs-server-internal"
 
-echo "--- Resetting NFS Client ---"
+echo "--- Resetting NFS Client Setup ---"
 
-# 1. Cleanup
-sudo umount -l $LOCAL_MOUNT 2>/dev/null
-sudo mkdir -p $LOCAL_MOUNT
+# 1. Cleanup both mount points
+sudo umount -l $RDMA_MOUNT 2>/dev/null
+sudo umount -l $TCP_MOUNT 2>/dev/null
+sudo mkdir -p $RDMA_MOUNT
+sudo mkdir -p $TCP_MOUNT
 
 # 2. Modules
 sudo modprobe rpcrdma
@@ -37,16 +40,30 @@ rawip      tpi_raw       -     inet      -      -       -
 local      tpi_cots_ord  -     loopback  -      -       -
 EOF
 
-# 5. Attempt Mount
-echo "Attempting RDMA mount (NFSv4.2) to $HOST_ALIAS..."
-# We use proto=rdma6 for IPv6 RDMA
-sudo ./mount.nfs $HOST_ALIAS:$REMOTE_PATH $LOCAL_MOUNT -v \
+echo "------------------------------------------------"
+
+# 5. Attempt RDMA Mount
+echo "Attempting RDMA mount (NFSv4.2) to $RDMA_MOUNT..."
+sudo ./mount.nfs $HOST_ALIAS:$REMOTE_PATH $RDMA_MOUNT -v \
     -o "rdma,port=$RDMA_PORT,vers=4.2,proto=rdma6"
 
-if mountpoint -q $LOCAL_MOUNT; then
-    echo "SUCCESS: Mounted via RDMA"
+if mountpoint -q $RDMA_MOUNT; then
+    echo "SUCCESS: RDMA mount established at $RDMA_MOUNT"
 else
-    echo "RDMA FAILED, trying TCP6 fallback..."
-    sudo ./mount.nfs $HOST_ALIAS:$REMOTE_PATH $LOCAL_MOUNT -v \
-        -o "proto=tcp6,vers=4.2"
+    echo "ERROR: RDMA mount failed."
 fi
+
+echo "------------------------------------------------"
+
+# 6. Attempt TCP Mount
+echo "Attempting TCP mount (NFSv4.2/IPv6) to $TCP_MOUNT..."
+sudo ./mount.nfs $HOST_ALIAS:$REMOTE_PATH $TCP_MOUNT -v \
+    -o "proto=tcp6,vers=4.2"
+
+if mountpoint -q $TCP_MOUNT; then
+    echo "SUCCESS: TCP mount established at $TCP_MOUNT"
+else
+    echo "ERROR: TCP mount failed."
+fi
+
+echo "--- Script Finished ---"
