@@ -21,7 +21,7 @@ sudo umount -l $TCP_MOUNT 2>/dev/null
 sudo mkdir -p $RDMA_MOUNT
 sudo mkdir -p $TCP_MOUNT
 
-# 2. Modules (Ensuring both the generic and transport-specific modules)
+# 2. Modules
 sudo modprobe rpcrdma
 sudo modprobe xprtrdma
 
@@ -29,7 +29,7 @@ sudo modprobe xprtrdma
 sudo sed -i "/$HOST_ALIAS/d" /etc/hosts
 echo "$SERVER_IP $HOST_ALIAS" | sudo tee -a /etc/hosts > /dev/null
 
-# 4. TI-RPC Netconfig
+# 4. TI-RPC Netconfig (Kept for internal library resolution)
 cat << 'EOF' | sudo tee /etc/netconfig > /dev/null
 rdma6      tpi_cots_ord  v     inet6    rdma    -       -
 tcp6       tpi_cots_ord  v     inet6    tcp     -       -
@@ -45,15 +45,23 @@ echo "------------------------------------------------"
 
 # 5. Attempt RDMA Mount
 echo "Attempting RDMA mount (NFSv4.2) to $RDMA_MOUNT..."
-# FIX: Removed the leading 'rdma,' from the -o string. 
-# 'proto=rdma6' is the modern, correct way to specify transport and family.
+# Using 'proto=rdma'. The kernel will use IPv6 because $HOST_ALIAS resolves to an IPv6 addr.
 sudo ./mount.nfs $HOST_ALIAS:$REMOTE_PATH $RDMA_MOUNT -v \
-    -o "vers=4.2,port=$RDMA_PORT,proto=rdma6"
+    -o "vers=4.2,port=$RDMA_PORT,proto=rdma"
 
 if mountpoint -q $RDMA_MOUNT; then
     echo "SUCCESS: RDMA mount established at $RDMA_MOUNT"
 else
-    echo "ERROR: RDMA mount failed. Check 'dmesg' for 'nfs' or 'rpc' errors."
+    echo "RDMA proto=rdma failed. Trying legacy 'rdma' flag..."
+    # Fallback: Some versions of mount.nfs prefer the standalone 'rdma' keyword
+    sudo ./mount.nfs $HOST_ALIAS:$REMOTE_PATH $RDMA_MOUNT -v \
+        -o "rdma,vers=4.2,port=$RDMA_PORT"
+    
+    if mountpoint -q $RDMA_MOUNT; then
+        echo "SUCCESS: RDMA mount established (via legacy flag)"
+    else
+        echo "ERROR: RDMA mount failed completely."
+    fi
 fi
 
 echo "------------------------------------------------"
