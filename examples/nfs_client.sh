@@ -21,14 +21,15 @@ sudo umount -l $TCP_MOUNT 2>/dev/null
 sudo mkdir -p $RDMA_MOUNT
 sudo mkdir -p $TCP_MOUNT
 
-# 2. Modules
+# 2. Modules (Ensuring both the generic and transport-specific modules)
 sudo modprobe rpcrdma
+sudo modprobe xprtrdma
 
 # 3. Add Host Mapping
 sudo sed -i "/$HOST_ALIAS/d" /etc/hosts
 echo "$SERVER_IP $HOST_ALIAS" | sudo tee -a /etc/hosts > /dev/null
 
-# 4. TI-RPC Netconfig (CRITICAL: Must include RDMA entries)
+# 4. TI-RPC Netconfig
 cat << 'EOF' | sudo tee /etc/netconfig > /dev/null
 rdma6      tpi_cots_ord  v     inet6    rdma    -       -
 tcp6       tpi_cots_ord  v     inet6    tcp     -       -
@@ -44,13 +45,15 @@ echo "------------------------------------------------"
 
 # 5. Attempt RDMA Mount
 echo "Attempting RDMA mount (NFSv4.2) to $RDMA_MOUNT..."
+# FIX: Removed the leading 'rdma,' from the -o string. 
+# 'proto=rdma6' is the modern, correct way to specify transport and family.
 sudo ./mount.nfs $HOST_ALIAS:$REMOTE_PATH $RDMA_MOUNT -v \
-    -o "rdma,port=$RDMA_PORT,vers=4.2,proto=rdma6"
+    -o "vers=4.2,port=$RDMA_PORT,proto=rdma6"
 
 if mountpoint -q $RDMA_MOUNT; then
     echo "SUCCESS: RDMA mount established at $RDMA_MOUNT"
 else
-    echo "ERROR: RDMA mount failed."
+    echo "ERROR: RDMA mount failed. Check 'dmesg' for 'nfs' or 'rpc' errors."
 fi
 
 echo "------------------------------------------------"
@@ -58,7 +61,7 @@ echo "------------------------------------------------"
 # 6. Attempt TCP Mount
 echo "Attempting TCP mount (NFSv4.2/IPv6) to $TCP_MOUNT..."
 sudo ./mount.nfs $HOST_ALIAS:$REMOTE_PATH $TCP_MOUNT -v \
-    -o "proto=tcp6,vers=4.2"
+    -o "vers=4.2,proto=tcp6"
 
 if mountpoint -q $TCP_MOUNT; then
     echo "SUCCESS: TCP mount established at $TCP_MOUNT"
